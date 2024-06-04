@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Video</title>
+</head>
+<body>
+    <video id="remoteVideo" controls autoplay></video>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const room = 'my-video-room';
+        socket.emit('join', room);
+
+        const remoteVideo = document.getElementById('remoteVideo');
+        let pc;
+
+        const configuration = {
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        };
+
+        socket.on('user-joined', async () => {
+            pc = new RTCPeerConnection(configuration);
+
+            pc.onicecandidate = event => {
+                if (event.candidate) {
+                    socket.emit('signal', { room, data: { candidate: event.candidate } });
+                }
+            };
+
+            pc.ontrack = event => {
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            pc.onnegotiationneeded = async () => {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('signal', { room, data: { sdp: pc.localDescription } });
+            };
+        });
+
+        socket.on('signal', async ({ sdp, candidate }) => {
+            if (sdp) {
+                if (sdp.type === 'offer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    socket.emit('signal', { room, data: { sdp: pc.localDescription } });
+                } else if (sdp.type === 'answer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                }
+            } else if (candidate) {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+        });
+
+        socket.emit('join', room);
+    </script>
+</body>
+</html>
