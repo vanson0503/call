@@ -7,7 +7,6 @@
 </head>
 <body>
     <video id="localVideo" autoplay muted></video>
-    <button id="startStreaming">Start Streaming</button>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -44,7 +43,7 @@
             return pc;
         }
 
-        document.getElementById('startStreaming').addEventListener('click', async () => {
+        async function startStreaming() {
             if (!localStream) {
                 await startLocalStream();
             }
@@ -55,7 +54,9 @@
                 await pc.setLocalDescription(offer);
                 socket.emit('signal', { room, data: { sdp: pc.localDescription, socketId } });
             }
-        });
+        }
+
+        document.addEventListener('DOMContentLoaded', startStreaming);
 
         socket.on('user-joined', socketId => {
             if (!peerConnections[socketId]) {
@@ -82,8 +83,6 @@
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
             }
         });
-
-        startLocalStream();
     </script>
 </body>
 </html>
