@@ -53,6 +53,17 @@
         });
 
         socket.on('signal', async ({ sdp, candidate }) => {
+            if (!pc) {
+                pc = new RTCPeerConnection(configuration);
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+                pc.onicecandidate = event => {
+                    if (event.candidate) {
+                        socket.emit('signal', { room, data: { candidate: event.candidate } });
+                    }
+                };
+            }
+
             if (sdp) {
                 await pc.setRemoteDescription(new RTCSessionDescription(sdp));
                 if (sdp.type === 'offer') {

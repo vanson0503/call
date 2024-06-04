@@ -20,7 +20,7 @@
             iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
         };
 
-        socket.on('user-joined', async () => {
+        function createPeerConnection() {
             pc = new RTCPeerConnection(configuration);
 
             pc.onicecandidate = event => {
@@ -33,22 +33,26 @@
                 remoteVideo.srcObject = event.streams[0];
             };
 
-            pc.onnegotiationneeded = async () => {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                socket.emit('signal', { room, data: { sdp: pc.localDescription } });
-            };
+            return pc;
+        }
+
+        socket.on('user-joined', async () => {
+            if (!pc) {
+                pc = createPeerConnection();
+            }
         });
 
         socket.on('signal', async ({ sdp, candidate }) => {
+            if (!pc) {
+                pc = createPeerConnection();
+            }
+
             if (sdp) {
+                await pc.setRemoteDescription(new RTCSessionDescription(sdp));
                 if (sdp.type === 'offer') {
-                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
                     socket.emit('signal', { room, data: { sdp: pc.localDescription } });
-                } else if (sdp.type === 'answer') {
-                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
                 }
             } else if (candidate) {
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
